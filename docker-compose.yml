@@ -1,6 +1,6 @@
 services:
   app:
-    image: ${DOCKER_USERNAME}/${DOCKER_TYPE}:${DOCKER_TAG}
+    image: ${DEPLOY_USERNAME}/${DEPLOY_TYPE}:${DEPLOY_TAG}
     restart: always
     deploy:
       replicas: 3
