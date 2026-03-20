@@ -1,0 +1,81 @@
+name: Auto Deploy Application
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  DEPLOY_TYPE: staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Deployment Tag
+        run: echo "DEPLOY_TAG=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Check if deploy tag already exists in registry
+        run: |
+          export DOCKER_CLI_EXPERIMENTAL=enabled
+          
+          echo "Checking tag: ${{ env.DEPLOY_TAG }} for environment: ${{ env.DEPLOY_TYPE }}"
+          
+          if docker manifest inspect "${{ secrets.DOCKER_USERNAME }}/${{ env.DEPLOY_TYPE }}:${{ env.DEPLOY_TAG }}" > /dev/null 2>&1; then
+            echo "Error: Tag '${{ env.DEPLOY_TAG }}' already exists. This shouldn't happen with unique commit SHAs."
+            exit 1
+          fi
+          
+          echo "Tag does not exist. Proceeding with build."
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/${{ env.DEPLOY_TYPE }}:${{ env.DEPLOY_TAG }}"
+          
+          docker build -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
+
+      - name: Copy configs to VM via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USERNAME }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          source: "docker-compose.yml,nginx.conf"
+          target: "~/"
+
+      - name: Execute deployment on VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USERNAME }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          script: |
+            export DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
+            export DEPLOY_TYPE="${{ env.DEPLOY_TYPE }}"
+            export DEPLOY_TAG="${{ env.DEPLOY_TAG }}"
+            
+            echo "Logging into Docker..."
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            
+            echo "Pulling latest image..."
+            docker pull $DOCKER_USERNAME/$DEPLOY_TYPE:$DEPLOY_TAG
+            
+            echo "Cleaning up old containers..."
+            docker compose down --remove-orphans
+            
+            echo "Starting new containers..."
+            docker compose up -d --scale app=3 --no-deps app proxy
+            
+            echo "Pruning unused images..."
+            docker image prune -f

@@ -7,7 +7,7 @@ const port = 3000;
 app.get("/", (req, res) => {
   // Docker sets the hostname of each replica to the container id by default
   const containerId = os.hostname(); 
-  res.send(`Welcome to GCP CI/CD Deployment Demo! Running on container: ${containerId}`);
+  res.send(`Welcome to GCP CI/CD Demo! Running on container: ${containerId}`);
 });
 
 // Listen on 0.0.0.0 so Docker can expose it externally
