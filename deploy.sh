@@ -53,20 +53,22 @@ echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 docker build -t $DOCKER_USERNAME/$DEPLOY_TYPE:$DEPLOY_TAG .
 docker push $DOCKER_USERNAME/$DEPLOY_TYPE:$DEPLOY_TAG
 
+# we will sync the lastest code changes to our vm using scp
+echo "Syncing latest code changes to VM instance..."
+scp docker-compose.yml nginx.conf $GCP_VM_SSH_URL:~/
+
 # once we push the image to our registry, we need to ssh into our vm instance and pull the latest image, then restart the container
-ssh -o "StrictHostKeyChecking=no" "$GCP_VM_SSH_URL" << EOF
-  # 1. Log in on the REMOTE machine
-  echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+ssh -o "StrictHostKeyChecking=no" $GCP_VM_SSH_URL << EOF
+  export DOCKER_USERNAME=$DOCKER_USERNAME
+  export DEPLOY_TYPE=$DEPLOY_TYPE
+  export DEPLOY_TAG=$DEPLOY_TAG
+  export DOCKER_PASSWORD=$DOCKER_PASSWORD
+
+  docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+  docker pull $DOCKER_USERNAME/$DEPLOY_TYPE:$DEPLOY_TAG
+
+  # run compose up command to restart the container with the new image
+  docker compose up -d --scale app=3 --no-deps app proxy
   
-  # 2. Pull the image now that we are authorized
-  docker pull "$DOCKER_USERNAME/$DEPLOY_TYPE:$DEPLOY_TAG"
-  
-  # 3. Restart container
-  docker stop "$DEPLOY_TYPE" || true
-  docker rm "$DEPLOY_TYPE" || true
-  docker run -d --name "$DEPLOY_TYPE" -p 80:3000 "$DOCKER_USERNAME/$DEPLOY_TYPE:$DEPLOY_TAG"
-  
-  # 4. Cleanup
-  docker logout
   docker image prune -f
 EOF
