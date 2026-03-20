@@ -1,7 +1,7 @@
 DEPLOY_TAG=$1
 DEPLOY_TYPE=$2
 
-$DEPLOY_TYPE=${DEPLOY_TYPE:-staging}
+DEPLOY_TYPE=${DEPLOY_TYPE:-staging}
 
 if [ "${DEPLOY_TYPE}" != "staging" ] && [ "${DEPLOY_TYPE}" != "production" ]; then
   echo "Error: Invalid deploy type passed. Usage: npm run deploy <deploy-tag> 'staging'|'production'"
