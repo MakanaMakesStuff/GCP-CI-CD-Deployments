@@ -4,7 +4,7 @@ const port = 3000;
 
 // Simple test route
 app.get("/", (req, res) => {
-  res.send("Hello from My Staging App!");
+  res.send("Welcome to GCP CI/CD Deployment Demo!");
 });
 
 // Listen on 0.0.0.0 so Docker can expose it externally
