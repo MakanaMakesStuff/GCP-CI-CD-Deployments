@@ -12,5 +12,5 @@ app.get("/", (req, res) => {
 
 // Listen on 0.0.0.0 so Docker can expose it externally
 app.listen(port, "0.0.0.0", () => {
-  console.log(`App listening at http://0.0.0.0:${port}`);
+  console.log(`App listening on port ${port}`);
 });
