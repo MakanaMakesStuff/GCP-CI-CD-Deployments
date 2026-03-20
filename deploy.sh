@@ -62,13 +62,12 @@ ssh -o "StrictHostKeyChecking=no" $GCP_VM_SSH_URL << EOF
   export DOCKER_USERNAME=$DOCKER_USERNAME
   export DEPLOY_TYPE=$DEPLOY_TYPE
   export DEPLOY_TAG=$DEPLOY_TAG
-  export DOCKER_PASSWORD=$DOCKER_PASSWORD
 
-  docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+  echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   docker pull $DOCKER_USERNAME/$DEPLOY_TYPE:$DEPLOY_TAG
 
   # run compose up command to restart the container with the new image
   docker compose up -d --scale app=3 --no-deps app proxy
-  
+
   docker image prune -f
 EOF
